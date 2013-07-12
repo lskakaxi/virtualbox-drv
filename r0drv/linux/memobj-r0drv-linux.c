@@ -478,9 +478,7 @@ int rtR0MemObjNativeFree(RTR0MEMOBJ pMem)
                 Assert(pTask);
                 if (pTask && pTask->mm)
                 {
-                    down_write(&pTask->mm->mmap_sem);
                     MY_DO_MUNMAP(pTask->mm, (unsigned long)pMemLnx->Core.pv, pMemLnx->Core.cb);
-                    up_write(&pTask->mm->mmap_sem);
                 }
             }
             else
@@ -503,9 +501,7 @@ int rtR0MemObjNativeFree(RTR0MEMOBJ pMem)
                 Assert(pTask);
                 if (pTask && pTask->mm)
                 {
-                    down_write(&pTask->mm->mmap_sem);
                     MY_DO_MUNMAP(pTask->mm, (unsigned long)pMemLnx->Core.pv, pMemLnx->Core.cb);
-                    up_write(&pTask->mm->mmap_sem);
                 }
             }
             else
@@ -1080,18 +1076,14 @@ int rtR0MemObjNativeReserveUser(PPRTR0MEMOBJINTERNAL ppMem, RTR3PTR R3PtrFixed, 
     /*
      * Let rtR0MemObjLinuxDoMmap do the difficult bits.
      */
-    down_write(&pTask->mm->mmap_sem);
     pv = rtR0MemObjLinuxDoMmap(R3PtrFixed, cb, uAlignment, pTask, RTMEM_PROT_NONE);
-    up_write(&pTask->mm->mmap_sem);
     if (pv == (void *)-1)
         return VERR_NO_MEMORY;
 
     pMemLnx = (PRTR0MEMOBJLNX)rtR0MemObjNew(sizeof(*pMemLnx), RTR0MEMOBJTYPE_RES_VIRT, pv, cb);
     if (!pMemLnx)
     {
-        down_write(&pTask->mm->mmap_sem);
         MY_DO_MUNMAP(pTask->mm, (unsigned long)pv, cb);
-        up_write(&pTask->mm->mmap_sem);
         return VERR_NO_MEMORY;
     }
 
@@ -1276,8 +1268,8 @@ int rtR0MemObjNativeMapUser(PPRTR0MEMOBJINTERNAL ppMem, RTR0MEMOBJ pMemToMap, RT
          * Allocate user space mapping.
          */
         void *pv;
-        down_write(&pTask->mm->mmap_sem);
         pv = rtR0MemObjLinuxDoMmap(R3PtrFixed, pMemLnxToMap->Core.cb, uAlignment, pTask, fProt);
+        down_write(&pTask->mm->mmap_sem);
         if (pv != (void *)-1)
         {
             /*
@@ -1387,7 +1379,9 @@ int rtR0MemObjNativeMapUser(PPRTR0MEMOBJINTERNAL ppMem, RTR0MEMOBJ pMemToMap, RT
             /*
              * Bail out.
              */
+	    up_write(&pTask->mm->mmap_sem);
             MY_DO_MUNMAP(pTask->mm, (unsigned long)pv, pMemLnxToMap->Core.cb);
+	    down_write(&pTask->mm->mmap_sem);
         }
         up_write(&pTask->mm->mmap_sem);
         rtR0MemObjDelete(&pMemLnx->Core);
